@@ -23,12 +23,12 @@ request.onsuccess = function(event) {
   }
 };
 
-// This function will be executed if we attempt to submit a new pizza and there's no internet connection
+// This function will be executed if we attempt to submit a new transaction and there's no internet connection
 function saveRecord(record) {
   // open a new transaction with the database with read and write permissions 
   const transaction = db.transaction(['new_transaction'], 'readwrite');
 
-  // access the object store for `new_pizza`
+  // access the object store for `new_transaction`
   const transactionsObjectStore = transaction.objectStore('new_transaction');
 
   // add record to your store with add method
@@ -40,3 +40,49 @@ request.onerror = function(event) {
   console.log(event.target.errorCode);
   saveRecord(formData);
 };
+
+function uploadTransactions() {
+  //open db transaction
+  const transaction = db.transaction(['new_transaction'], 'readwrite');
+  
+  //access your objt store
+  const transactionsObjectStore = transaction.objectStore('new_transaction');
+
+  //get all record from store
+  const getAll = transactionsObjectStore.getAll();
+
+  //upon successful getall, run this
+  getAll.onsuccess = function() {
+    //if data, send to api server
+    if(getAll.result.length > 0) {
+      fetch('/api/transaction', {
+        method: 'POST',
+        body: JSON.stringify(getAll.result),
+        headers: {
+          Accept: 'application/json, text/plain, */*',
+          'Content-Type': 'application/json'
+        }
+      })
+      .then(response => response.json())
+        .then(serverResponse => {
+          if (serverResponse.message) {
+            throw new Error(serverResponse);
+          }
+          // open one more transaction
+          const transaction = db.transaction(['new_transaction'], 'readwrite');
+          // access the new_transaction object store
+          const transactionObjectStore = transaction.objectStore('new_transaction');
+          // clear all items in your store
+          transactionObjectStore.clear();
+
+          alert('All saved transactions have been submitted!');
+        })
+        .catch(err => {
+          console.log(err);
+        });
+    } 
+  }
+}
+
+//listen for app coming back online
+window.addEventListener('online', uploadTransactions);
